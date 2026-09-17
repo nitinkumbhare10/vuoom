@@ -1,0 +1,77 @@
+[package]
+name = "vuoom"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Screen recordings that zoom where it matters — a free, native Windows cinematic screen recorder that exports demo GIFs."
+
+[lib]
+# `_lib` suffix avoids a name clash with the binary on Windows (rust-lang/cargo#8519).
+name = "vuoom_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+# Guard against two Vuooms running at once: both would race on recovery
+# session-id allocation/pruning under %TEMP%/vuoom-recovery and corrupt each
+# other's recordings. Must be the first plugin registered (see lib.rs).
+tauri-plugin-single-instance = "2"
+# Auto-update from GitHub Releases: the updater checks/downloads/installs the
+# signed bundle; the process plugin relaunches the app afterwards.
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+serde.workspace = true
+serde_json.workspace = true
+base64 = "0.22"
+
+# Diagnostics. `env-filter` gives us RUST_LOG honoring; `tracing-appender`
+# writes a rotating daily log file so a windowed release build (which detaches
+# from any console, so stderr is invisible) still leaves debuggable traces on
+# disk. Init lives in `init_logging` (lib.rs).
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-appender = "0.2"
+
+glam.workspace = true
+
+# Engine crates.
+vuoom-zoom.workspace = true
+vuoom-project.workspace = true
+vuoom-encode.workspace = true
+vuoom-input.workspace = true
+vuoom-capture.workspace = true
+vuoom-render.workspace = true
+vuoom-preview.workspace = true
+
+# Win32 helpers: SetWindowDisplayAffinity (exclude overlays from screen capture),
+# hotkey polling. Pinned to the version windows-capture pulls in (0.62) so vuoom-input
+# and this crate share that tree instead of spawning a second `windows` compile.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    # SetWindowSubclass/DefSubclassProc/RemoveWindowSubclass — the recording panel's
+    # WM_MOVING drag wall (see drag_wall.rs) subclasses the main window's top-level HWND.
+    "Win32_UI_Shell",
+    # DwmGetWindowAttribute(DWMWA_CLOAKED): skip suspended UWP windows in the picker.
+    "Win32_Graphics_Dwm",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Media_MediaFoundation",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    # GetDiskFreeSpaceExW — free-space guard so a raw-BGRA stream can't silently fill the disk.
+    "Win32_Storage_FileSystem",
+    # PrintWindow lives under Storage::Xps in windows-rs 0.62 (window backdrop grabs).
+    "Win32_Storage_Xps",
+] }
+# CF_HDROP clipboard file copy (paste the exported GIF into Slack/Discord/etc.).
+# Safe wrapper over the DROPFILES + clipboard dance; replaces hand-rolled unsafe.
+clipboard-win = "5"

@@ -1,0 +1,15 @@
+[package]
+name = "vuoom-capture"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Windows screen capture (WGC via windows-capture; DXGI Desktop Duplication fallback) → BGRA frames."
+
+[dependencies]
+vuoom-input.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-capture = "2"

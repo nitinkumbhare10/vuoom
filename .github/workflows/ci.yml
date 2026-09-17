@@ -1,0 +1,80 @@
+name: CI
+
+# Runs all builds, checks, and tests on GitHub Actions (not locally).
+# Adapted from the Tauri v2 CI/CD guide for Vuoom's pnpm + Cargo-workspace layout.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch/PR.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Opt JS actions into Node 24 (Node 20 is being deprecated on the runners).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  ci:
+    runs-on: windows-latest # Vuoom is Windows-only (WGC capture, wgpu DX12)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust (stable + rustfmt + clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check frontend (tsc --noEmit)
+        run: pnpm run typecheck
+
+      - name: Lint frontend (Biome)
+        run: pnpm run lint
+
+      # Build the frontend FIRST: Tauri's generate_context! needs dist/ to exist
+      # before cargo can check/compile the app crate.
+      - name: Build frontend (vite -> dist/)
+        run: pnpm run build
+
+      - name: Rust format check
+        run: cargo fmt --all --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --workspace
+
+  # ─── Dependency + license audit (cheap ubuntu runner) ─────────────────────
+  # cargo-deny resolves the full dependency graph regardless of target, so it
+  # runs fine on Linux even though Vuoom is Windows-only. Enforces the
+  # Apache-2.0 / no-copyleft license posture (see deny.toml).
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: cargo-deny (advisories, bans, licenses, sources)
+        uses: EmbarkStudios/cargo-deny-action@v2
