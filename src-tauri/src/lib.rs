@@ -100,7 +100,13 @@ fn build_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     use tauri::tray::TrayIconBuilder;
 
     let show = MenuItem::with_id(app, "show", "Open Vuoom", true, None::<&str>)?;
-    let stop = MenuItem::with_id(app, "stop", "Stop Recording (Ctrl+Shift+X)", true, None::<&str>)?;
+    let stop = MenuItem::with_id(
+        app,
+        "stop",
+        "Stop Recording (Ctrl+Shift+X)",
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "Quit Vuoom", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &stop, &quit])?;
 
